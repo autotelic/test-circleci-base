@@ -1,0 +1,63 @@
+version: 2.1
+
+jobs:
+  build-test:
+    docker:
+      - image: circleci/node:8.10
+    steps:
+      - checkout
+      - run:
+          name: Run unit and integration tests
+          command: make test-app
+  deploy-staging:
+    docker:
+      - image: autotelic/circleci-base:0.0.1
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run:
+          name: Run setup script
+          command: sh .circleci/setup-heroku.sh
+      - add_ssh_keys:
+          fingerprints:
+            - "ad:4d:02:ad:ca:03:0d:8d:78:d8:ae:bf:35:7a:ba:75"
+      - run:
+          name: Deploy apps to staging
+          command: |
+            heroku container:login
+            make deploy-image-staging
+  deploy-production:
+    docker:
+      - image: autotelic/circleci-base:0.0.1
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run:
+          name: Run setup script
+          command: sh .circleci/setup-heroku.sh
+      - add_ssh_keys:
+          fingerprints:
+            - "ad:4d:02:ad:ca:03:0d:8d:78:d8:ae:bf:35:7a:ba:75"
+      - run:
+          name: Deploy apps to production
+          command: |
+            heroku container:login
+            make deploy-image-production
+
+workflows:
+  version: 2
+  build-test-and-deploy:
+    jobs:
+      - build-test
+      - deploy-staging:
+          requires:
+            - build-test
+          filters:
+            branches:
+              only: develop
+      - deploy-production:
+          requires:
+            - build-test
+          filters:
+            branches:
+              only: master
